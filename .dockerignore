@@ -1,0 +1,10 @@
+.devcontainer/
+dist/
+node_modules/
+.dockerignore
+.gitignore
+docker-compose.yaml
+Dockerfile
+core
+README.md
+secrets.env

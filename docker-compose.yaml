@@ -1,0 +1,26 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:14-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: parking-bot
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: parking-bot
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    links:
+      - postgres
+    depends_on:
+      - postgres
+    restart: always
+    env_file:
+      # for `SLACK_TOKEN` that we don't want to commit to git by accident
+      - secrets.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: parking-bot
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: parking-bot
