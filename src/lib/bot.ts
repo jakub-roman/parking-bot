@@ -1,67 +1,68 @@
-import { Logger } from 'tslog';
-import Sugar from "sugar"
+import { Logger } from 'tslog'
+import Sugar from 'sugar'
 
-import { Message, SlackUser } from "../types"
-import { User, Reservation, ParkingSpot } from "../entities"
-import { spotAdmin } from './spot_admin';
+import { Message, SlackUser } from '../types'
+import { User, Reservation, ParkingSpot } from '../entities'
+import { spotAdmin } from './spot_admin'
 
 export class Bot {
-  private log: Logger
-  private user: SlackUser
-  private adminUsers: string[]
+  private readonly log: Logger
+  private readonly user: SlackUser
+  private readonly adminUsers: string[]
 
-  constructor(user: SlackUser, log: Logger, adminUsers: string[]) {
+  constructor (user: SlackUser, log: Logger, adminUsers: string[]) {
     this.user = user
     this.log = log
     this.adminUsers = adminUsers
   }
 
-  public async handle(message: Message, respFunction: Function) : Promise<void> {
+  public async handle (message: Message, respFunction: (response: string) => void): Promise<void> {
     this.log.debug(`Handling message '${message.text}'`)
-    var text: string = this.stripUsername(message.text)
+    const text: string = this.stripUsername(message.text)
 
-    var matchGroups: { [key: string]: string } | undefined
+    let matchGroups: { [key: string]: string } | undefined
 
-    if ( matchGroups = text.match(/^capacity\s*(?<date>.*)?$/i)?.groups ) {
-      const date: Date = this.date(matchGroups.date) 
+    if ((matchGroups = text.match(/^capacity\s*(?<date>.*)?$/i)?.groups) != null) {
+      const date: Date = this.date(matchGroups.date)
 
-      this.capacity(date).then( (response) => {
+      this.capacity(date).then((response) => {
         respFunction(response)
       })
-    } else if ( matchGroups = text.match(/^reserve\s*(\s+spot\s+(?<spot>\w+))?(\s+(?<date>.*))?$/i)?.groups ) {
-      const date: Date = this.date(matchGroups!.date)
-      const user = await User.new(message.username!, message.user)
+    } else if ((matchGroups = text.match(/^reserve\s*(\s+spot\s+(?<spot>\w+))?(\s+(?<date>.*))?$/i)?.groups) != null) {
+      const date: Date = this.date(matchGroups.date)
+      const user = await User.new(message.username, message.user)
 
-      const spotName: string = matchGroups!.spot
-        ? matchGroups!.spot
+      const spotName: string = matchGroups.spot
+        ? matchGroups.spot
         : await this.getAvailableSpot(date)
 
-      const spot = await ParkingSpot.findOneBy({name: spotName})
+      const spot = await ParkingSpot.findOneBy({ name: spotName })
+      if (spot == null) throw Error(`Spot ${spotName} doesn't exist!`)
 
-      Reservation.new(date, user, spot!).then( () => {
+      Reservation.new(date, user, spot).then(() => {
         respFunction(`Reserved spot ${spotName} on ${date.toDateString()} for user ${user.name}`)
       })
-    } else if ( matchGroups = text.match(/^cancel\s*(\s+(?<date>.*))?$/i)?.groups ) {
-      const date: Date = this.date(matchGroups!.date)
-      const response = Reservation.removeUserReservation(message.username!, date)
+    } else if ((matchGroups = text.match(/^cancel\s*(\s+(?<date>.*))?$/i)?.groups) != null) {
+      const date: Date = this.date(matchGroups.date)
+      const response = await Reservation.removeUserReservation(message.username, date)
 
       respFunction(response)
-    } else if ( matchGroups = text.match(/^spot\s+(?<spot_command>(list|create|delete))(\s+(?<spot_name>\w+))?$/i)?.groups ) {
-      const user = message.username!
-      if ( this.adminUsers.includes(user) ){
+    } else if ((matchGroups = text.match(/^spot\s+(?<spot_command>(list|create|delete))(\s+(?<spot_name>\w+))?$/i)?.groups) != null) {
+      const user = message.username
+      if (this.adminUsers.includes(user)) {
         const response = await spotAdmin(matchGroups.spot_command, matchGroups.spot_name, this.help())
         respFunction(response)
-      }else{
+      } else {
         respFunction(`User ${user} is not allowed to manage spots`)
       }
-    } else if ( text.match(/^help$/i) ) {
+    } else if (text.match(/^help$/i) != null) {
       respFunction(this.help())
     } else {
       throw new Error(`Unknown command '${text}'\n${this.help()}`)
     }
   }
 
-  public help(): string {
+  public help (): string {
     return `
 Usage:
   <@${this.user.id}> <command> [arguments]
@@ -76,47 +77,47 @@ Commands:
 `
   }
 
-  private async capacity(date: Date): Promise<string> {
-    var response: string = ""
+  private async capacity (date: Date): Promise<string> {
+    let response = ''
 
     // find reserved spots
     const reserved = await ParkingSpot.reserved(date)
-    if(reserved.length === 0){
-      response = response.concat(`No reserved spots\n`)
-    }else{
-      response = response.concat(`Reserved spots:\n${reserved.map(s => `• ${s.name}`).join("\n")}\n`)
+    if (reserved.length === 0) {
+      response = response.concat('No reserved spots\n')
+    } else {
+      response = response.concat(`Reserved spots:\n${reserved.map(s => `• ${s.name}`).join('\n')}\n`)
     }
 
     // find available spots
     const available = await ParkingSpot.available(date)
-    if(available.length === 0){
+    if (available.length === 0) {
       response = response.concat('No available spots left\n')
-    }else{
-      response = response.concat(`Available spots:\n${available.map(s => `• ${s.name}`).join("\n")}\n`)
+    } else {
+      response = response.concat(`Available spots:\n${available.map(s => `• ${s.name}`).join('\n')}\n`)
     }
 
     return response
   }
 
-  private async getAvailableSpot(date: Date): Promise<string> {
+  private async getAvailableSpot (date: Date): Promise<string> {
     const spots = await ParkingSpot.available(date)
     if (spots.length === 0) throw new Error('No available spots left')
     return spots.shift()!.name
   }
 
-  private date(date: string): Date {
+  private date (date: string): Date {
     const d = Sugar.Date.create(date)
-    if ( isNaN(d.getTime()) ) {
-      throw new Error("Invalid Date")
+    if (isNaN(d.getTime())) {
+      throw new Error('Invalid Date')
     } else {
       return d
     }
   }
 
-  private stripUsername(text: string): string {
+  private stripUsername (text: string): string {
     return text.replace(
       new RegExp(`^<@${this.user.id}>\\s*`),
-      ""
+      ''
     )
   }
 }
