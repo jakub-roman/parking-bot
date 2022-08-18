@@ -21,7 +21,7 @@ export class Reservation extends BaseEntity {
   )
     spot!: ParkingSpot
 
-  static new async (date: Date, user: User, spot: ParkingSpot): Promise<Reservation> {
+  static async new (date: Date, user: User, spot: ParkingSpot): Promise<Reservation> {
     const reservation = new Reservation()
     reservation.date = date
     reservation.user = user

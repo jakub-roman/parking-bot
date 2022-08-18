@@ -12,7 +12,7 @@ export class User extends BaseEntity {
   @OneToMany(() => Reservation, (reservation) => reservation.user)
     reservations!: Reservation[]
 
-  static new async (name: string, id: string): Promise<User> {
+  static async new (name: string, id: string): Promise<User> {
     const user: User = new User()
     user.name = name
     user.id = id

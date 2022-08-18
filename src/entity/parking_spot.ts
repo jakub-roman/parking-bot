@@ -9,7 +9,7 @@ export class ParkingSpot extends BaseEntity {
   @OneToMany(() => Reservation, (reservation) => reservation.spot)
     reservations!: Reservation[]
 
-  static new async (name: string): Promise<ParkingSpot> {
+  static async new (name: string): Promise<ParkingSpot> {
     const spot = new ParkingSpot()
     spot.name = name
     return spot.save()
