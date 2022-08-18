@@ -17,6 +17,5 @@ jobs:
         docker login -u $USERNAME -p "$PASSWORD"
     - name: build and push containers
       run: |
-        docker build \
-          --tag jakubroman/parking-bot:$GITHUB_REF_NAME \
-          .
+        docker build --tag jakubroman/parking-bot:$GITHUB_REF_NAME .
+        docker push jakubroman/parking-bot:$GITHUB_REF_NAME
