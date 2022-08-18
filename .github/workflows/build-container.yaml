@@ -1,0 +1,21 @@
+name: Build container
+on:
+  push:
+    tags:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: login to dockerhub
+      env:
+        USERNAME: ${{ secrets.DOCKERHUB_USER }}
+        PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+      run: |
+        docker login -u $USERNAME -p "$PASSWORD"
+    - name: build and push containers
+      run: |
+        docker build \
+          --tag jakubroman/parking-bot:$GITHUB_REF_NAME \
+          .
