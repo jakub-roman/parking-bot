@@ -4,6 +4,7 @@ import Sugar from 'sugar'
 import { Message, SlackUser } from '../types'
 import { User, Reservation, ParkingSpot } from '../entities'
 import { spotAdmin } from './spot_admin'
+import { BotOutputError } from '../errors'
 
 export class Bot {
   private readonly log: Logger
@@ -16,19 +17,23 @@ export class Bot {
     this.adminUsers = adminUsers
   }
 
-  public async handle (message: Message, respFunction: (response: string) => void): Promise<void> {
+  public async handle (message: Message): Promise<string> {
     this.log.debug(`Handling message '${message.text}'`)
     const text: string = this.stripUsername(message.text)
 
     let matchGroups: { [key: string]: string } | undefined
 
     if ((matchGroups = text.match(/^capacity\s*(?<date>.*)?$/i)?.groups) != null) {
+      /*
+       * Show parking capacity
+       */
       const date: Date = this.date(matchGroups.date)
 
-      this.capacity(date).then((response) => {
-        respFunction(response)
-      })
+      return this.capacity(date)
     } else if ((matchGroups = text.match(/^reserve\s*(\s+spot\s+(?<spot>\w+))?(\s+(?<date>.*))?$/i)?.groups) != null) {
+      /*
+       * Reserve spot
+       */
       const date: Date = this.date(matchGroups.date)
       const user = await User.new(message.username, message.user)
 
@@ -37,28 +42,32 @@ export class Bot {
         : await this.getAvailableSpot(date)
 
       const spot = await ParkingSpot.findOneBy({ name: spotName })
-      if (spot == null) throw Error(`Spot ${spotName} doesn't exist!`)
+      if (spot == null) return `Spot ${spotName} doesn't exist!`
 
-      Reservation.new(date, user, spot).then(() => {
-        respFunction(`Reserved spot ${spotName} on ${date.toDateString()} for user ${user.name}`)
-      })
+      const reservation = await Reservation.new(date, user, spot)
+
+      return `Reserved spot *${reservation.spot.name}* on *${reservation.date.toDateString()}* for user *${reservation.user.name}*`
     } else if ((matchGroups = text.match(/^cancel\s*(\s+(?<date>.*))?$/i)?.groups) != null) {
+      /*
+       * Cancel reservation of spot
+       */
       const date: Date = this.date(matchGroups.date)
-      const response = await Reservation.removeUserReservation(message.username, date)
-
-      respFunction(response)
+      return Reservation.removeUserReservation(message.username, date)
     } else if ((matchGroups = text.match(/^spot\s+(?<spot_command>(list|create|delete))(\s+(?<spot_name>\w+))?$/i)?.groups) != null) {
+      /*
+       * This is admin section
+       * Create/delete actions are only available to `admin` users
+       */
       const user = message.username
       if (this.adminUsers.includes(user)) {
-        const response = await spotAdmin(matchGroups.spot_command, matchGroups.spot_name, this.help())
-        respFunction(response)
+        return spotAdmin(matchGroups.spot_command, matchGroups.spot_name, this.help())
       } else {
-        respFunction(`User ${user} is not allowed to manage spots`)
+        throw new BotOutputError(`User ${user} is not allowed to manage spots`)
       }
     } else if (text.match(/^help$/i) != null) {
-      respFunction(this.help())
+      return this.help()
     } else {
-      throw new Error(`Unknown command '${text}'\n${this.help()}`)
+      return `Unknown command '${text}'\n${this.help()}`
     }
   }
 
@@ -73,42 +82,40 @@ Commands:
   reserve spot [spot] [date]      Reserve specific parking spot on given date (default: today)
   cancel [date]                   Cancel reservation on given date (default: today)
 
-  Note: [date] can be any string supported by Sugar library, ie. 'tomorrow', 'next Monday', etc.
+  Note: [date] can be free text string such as 'tomorrow', 'next Monday', 'first of September' etc.
 `
   }
 
   private async capacity (date: Date): Promise<string> {
-    let response = ''
-
-    // find reserved spots
     const reserved = await ParkingSpot.reserved(date)
-    if (reserved.length === 0) {
-      response = response.concat('No reserved spots\n')
-    } else {
-      response = response.concat(`Reserved spots:\n${reserved.map(s => `• ${s.name}`).join('\n')}\n`)
-    }
-
-    // find available spots
+    const r = reserved.length === 0 
+      ? `None` 
+      : `\n${reserved.map(s => `\t• *${s.name}* by user *${s.reservations[0].user.name}*`).join('\n')}`
+    
     const available = await ParkingSpot.available(date)
-    if (available.length === 0) {
-      response = response.concat('No available spots left\n')
-    } else {
-      response = response.concat(`Available spots:\n${available.map(s => `• ${s.name}`).join('\n')}\n`)
-    }
+    const a = available.length === 0 
+      ? `None`
+      : `\n${available.map(s => `\t• *${s.name}*`).join('\n')}`
 
-    return response
+    return `
+Capacity on *${date.toDateString()}*:
+
+Reserved spots: ${r}
+
+Available spots: ${a}
+`
   }
 
   private async getAvailableSpot (date: Date): Promise<string> {
     const spots = await ParkingSpot.available(date)
-    if (spots.length === 0) throw new Error('No available spots left')
+    if (spots.length === 0) throw new BotOutputError('No available spots left')
     return spots.shift()!.name
   }
 
   private date (date: string): Date {
     const d = Sugar.Date.create(date)
     if (isNaN(d.getTime())) {
-      throw new Error('Invalid Date')
+      throw new BotOutputError('Invalid Date')
     } else {
       return d
     }
@@ -116,7 +123,7 @@ Commands:
 
   private stripUsername (text: string): string {
     return text.replace(
-      new RegExp(`^<@${this.user.id}>\\s*`),
+      new RegExp(`<@${this.user.id}>\\s*`),
       ''
     )
   }

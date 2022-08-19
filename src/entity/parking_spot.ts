@@ -25,7 +25,9 @@ export class ParkingSpot extends BaseEntity {
   static async reserved (date: Date): Promise<ParkingSpot[]> {
     return ParkingSpot
       .createQueryBuilder('spot')
-      .where('name IN (SELECT "spotName" FROM reservation WHERE "date" = :date)', { date: date })
+      .leftJoinAndSelect('spot.reservations', 'reservation')
+      .leftJoinAndSelect('reservation.user', 'user')
+      .where('reservation.date = :date', { date: date })
       .getMany()
   }
 }
