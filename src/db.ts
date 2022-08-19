@@ -1,3 +1,4 @@
+// import { Logger } from 'tslog'
 import { DataSource } from 'typeorm'
 
 export const db = new DataSource({
@@ -7,6 +8,7 @@ export const db = new DataSource({
   username: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   database: process.env.POSTGRES_DB || 'parking-bot',
-  entities: ['src/entity/*.{js,ts}'],
-  synchronize: true
+  // logger: new Logger(),
+  entities: [`${__dirname}/entity/*.{js,ts}`],
+  migrations: [`${__dirname}/migrations/*.{js,ts}`]
 })

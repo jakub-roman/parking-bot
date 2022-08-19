@@ -15,10 +15,8 @@
     "dev": "NODE_ENV=development ts-node-dev src/app.ts",
     "test": "npm run lint",
     "lint": "eslint '{src,test}/**/*.{ts,js}'",
-    "typeorm:migration:generate": "typeorm-ts-node-esm migration:generate -d src/db.ts --outputJs",
-    "typeorm:migration:run": "typeorm-ts-node-esm migration:run -d src/db.ts",
-    "typeorm:schema:sync": "typeorm-ts-node-esm schema:sync -d src/db.ts",
-    "migration:run": "typeorm migration:run -d src/db.ts"
+    "typeorm:migration:generate": "typeorm-ts-node-esm migration:generate -d src/db.ts",
+    "typeorm:migration:run": "typeorm-ts-node-esm migration:run -d src/db.ts"
   },
   "dependencies": {
     "@slack/rtm-api": "^6.0.0",
