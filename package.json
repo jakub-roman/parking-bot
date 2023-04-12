@@ -25,7 +25,7 @@
     "reflect-metadata": "^0.1.13",
     "sugar": "^2.0.6",
     "tslog": "^3.3.3",
-    "typeorm": "^0.3.7"
+    "typeorm": "^0.3.14"
   },
   "devDependencies": {
     "@slack/types": "^2.7.0",
